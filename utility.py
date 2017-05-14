@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 
-def snap_from_video(video_path, capture_interval, image_folder, time_format="%Y%m%d_%H%M%S"):
+def snap_all_from_video(video_path, capture_interval, image_folder, time_format="%Y%m%d_%H%M%S"):
     video_filename = os.path.basename(video_path)
     video_filename_format = "%Y%m%d-%H%M%S-01.avi"
 
@@ -18,7 +18,34 @@ def snap_from_video(video_path, capture_interval, image_folder, time_format="%Y%
     while cap.isOpened():
         cap.set(0, video_pos_time)
         ret, frame = cap.read()
-        if ret:
+        if ret and cap.get(cv2.CAP_PROP_POS_AVI_RATIO) <= 0.999:
+            cv2.imwrite(image_folder + curr_time.strftime(time_format) + ".jpg", frame)
+            video_pos_time += capture_interval.total_seconds() * 1000  # in ms
+            curr_time += capture_interval
+        else:
+            break
+    end_time = curr_time - capture_interval
+
+    return initial_time, end_time
+
+
+def snap_all_from_video_whole_minute(video_path, capture_interval, image_folder, time_format="%Y%m%d_%H%M%S"):
+    video_filename = os.path.basename(video_path)
+    video_filename_format = "%Y%m%d-%H%M%S-01.avi"
+
+    # snap images from the video file
+    cap = cv2.VideoCapture(video_path)
+    initial_time = datetime.datetime.strptime(video_filename, video_filename_format)
+    shift = datetime.timedelta(seconds = 60 - initial_time.second)  # in s
+    video_pos_time = (60-initial_time.second) * 1000
+    initial_time += shift
+
+    curr_time = initial_time
+
+    while cap.isOpened():
+        cap.set(0, video_pos_time)
+        ret, frame = cap.read()
+        if ret and cap.get(cv2.CAP_PROP_POS_AVI_RATIO) <= 0.999:
             cv2.imwrite(image_folder + curr_time.strftime(time_format) + ".jpg", frame)
             video_pos_time += capture_interval.total_seconds() * 1000  # in ms
             curr_time += capture_interval
@@ -120,4 +147,3 @@ def read_flo_file(file_path):
 
     flo_file.close()
     return u, v
-
