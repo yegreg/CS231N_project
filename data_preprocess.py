@@ -16,8 +16,8 @@ def main():
 
     number_images = len(image_names)
     output_img_shape = [60, 80, 3]
-    all_images = np.ndarray([number_images] + output_img_shape)
-    pv_output = np.ndarray(number_images)
+    all_images = np.zeros([number_images] + output_img_shape)
+    pv_outputs = np.zeros(number_images)
     mono_pv = pd.read_csv("mono_pv_output.csv")
     valid_indices = []
 
@@ -29,22 +29,29 @@ def main():
         resizing_ratio = output_img_shape[0] / img.shape[0]
         all_images[i] = cv2.resize(img, None, fx=resizing_ratio, fy=resizing_ratio)
         image_time = datetime.datetime.strptime(image_names[i], image_names_format)
-        pv_output[i] = find_pv_output(image_time, mono_pv)
+        pv_output = find_pv_output(image_time, mono_pv)
+        pv_outputs[i] = pv_output
 
         if pv_output is not None:
             valid_indices.append(i)
+        else:
+            print('no associated pv output for image: ',i)
+
+        if i%10 ==0:
+            print('image processed: ',i, '/',number_images)
+            print('pv value:',pv_output)
 
     all_images = all_images[valid_indices, :, :, :]
-    pv_output = pv_output[valid_indices]
+    pv_outputs = pv_outputs[valid_indices]
 
     np.save('images.npy', all_images)
-    np.save('pv_output', pv_output)
+    np.save('pv_outputs', pv_outputs)
 
 
 def find_pv_output(dt, pv_data):
     line = pv_data[pv_data["unixTS"] == dt.timestamp()]
     try:
-        return line["Output"].iloc[0]
+        return line["Value"].iloc[0]
     except:
         return None
 
