@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import os
 import datetime
+import time
 import pandas as pd
 
 
@@ -16,11 +17,11 @@ def main():
 
     number_images = len(image_names)
     output_img_shape = [60, 80, 3]
-    all_images = np.zeros([number_images] + output_img_shape)
+    all_images = np.ndarray([number_images] + output_img_shape,dtype='uint8')
     pv_outputs = np.zeros(number_images)
     mono_pv = pd.read_csv("mono_pv_output.csv")
-    valid_indices = []
 
+    curr_time = time.process_time()
     for i in range(number_images):
         # Read in image file and the associated time stamp
         img = cv2.imread(os.path.join(image_folder, image_names[i]))
@@ -29,23 +30,21 @@ def main():
         resizing_ratio = output_img_shape[0] / img.shape[0]
         all_images[i] = cv2.resize(img, None, fx=resizing_ratio, fy=resizing_ratio)
         image_time = datetime.datetime.strptime(image_names[i], image_names_format)
-        pv_output = find_pv_output(image_time, mono_pv)
-        pv_outputs[i] = pv_output
-
-        if pv_output is not None:
-            valid_indices.append(i)
-        else:
-            print('no associated pv output for image: ',i)
+        pv_outputs[i] = find_pv_output(image_time, mono_pv)
 
         if i%10 ==0:
             print('image processed: ',i, '/',number_images)
-            print('pv value:',pv_output)
+            print('pv value:',pv_outputs[i])
 
+    print(np.sum(np.isnan(pv_outputs)),' images do not have matching pv output')
+    valid_indices = np.logical_not(np.isnan(pv_outputs))
     all_images = all_images[valid_indices, :, :, :]
     pv_outputs = pv_outputs[valid_indices]
 
     np.save('images.npy', all_images)
     np.save('pv_outputs', pv_outputs)
+
+    print(time.process_time()-curr_time)
 
 
 def find_pv_output(dt, pv_data):
