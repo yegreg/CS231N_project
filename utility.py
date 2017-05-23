@@ -34,18 +34,19 @@ def snap_all_from_video_whole_minute(video_path, capture_interval, image_folder,
     if len(video_filename) < 30:
         video_filename_format = "%Y%m%d-%H%M%S-01.avi"
     else:
-        video_filename = video_filename.split('_')[3]
+        video_filename = video_filename.split('_')[-3]
         video_filename_format = "%Y%m%d%H%M%S"
 
     # snap images from the video file
-    cap = cv2.VideoCapture(video_path)
     try:
         initial_time = datetime.datetime.strptime(video_filename, video_filename_format)
     except:
-        print("can't handle ",video_filename)
-        return datetime.datetime.now(),datetime.datetime.now()
-    shift = datetime.timedelta(seconds = 60 - initial_time.second)  # in s
-    video_pos_time = (60-initial_time.second) * 1000
+        print("can't handle ", video_filename)
+        return datetime.datetime.now(), datetime.datetime.now()
+
+    cap = cv2.VideoCapture(video_path)
+    shift = datetime.timedelta(seconds=60 - initial_time.second)  # in s
+    video_pos_time = (60 - initial_time.second) * 1000
     initial_time += shift
 
     curr_time = initial_time
@@ -54,7 +55,7 @@ def snap_all_from_video_whole_minute(video_path, capture_interval, image_folder,
         cap.set(0, video_pos_time)
         ret, frame = cap.read()
         if ret and cap.get(cv2.CAP_PROP_POS_AVI_RATIO) <= 0.999:
-            cv2.imwrite(os.path.join(image_folder,curr_time.strftime(time_format) + ".jpg"), frame)
+            cv2.imwrite(os.path.join(image_folder, curr_time.strftime(time_format) + ".jpg"), frame)
             video_pos_time += capture_interval.total_seconds() * 1000  # in ms
             curr_time += capture_interval
         else:

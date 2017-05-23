@@ -10,9 +10,7 @@ import utility
 def main():
     # Find all image filename
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    project_name = "trial_on_dec_vid"
-    project_path = dir_path + "\\" + project_name + "\\"
-    image_folder = project_path + "fisheye_images\\"
+    image_folder = os.path.join(dir_path , "fisheye_images")
     image_names = os.listdir(image_folder)
     image_names_format = "%Y%m%d_%H%M%S.jpg"
 

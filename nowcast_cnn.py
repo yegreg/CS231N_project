@@ -19,7 +19,7 @@ def main():
     # Build computational graph
     tf.reset_default_graph()  # Reset computational graph
 
-    x_var = tf.placeholder(tf.float32, [None, 60, 80, 3]) # x variable
+    x_var = tf.placeholder(tf.float32, [None, 60, 60, 3]) # x variable
     y_var = tf.placeholder(tf.float32, [None]) # y variable
     is_training = tf.placeholder(tf.bool) # flag
     pred_y_var = cnn_73_model(x_var, y_var, is_training) # model in use
@@ -36,7 +36,7 @@ def main():
 
     # Train the model
     # initialize all variable
-    num_epochs = 30
+    num_epochs = 5
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
     # initialize loss and rel_err history list
@@ -44,11 +44,11 @@ def main():
     train_error_hist = []
     val_error_hist = []
 
-    for i in range(num_epochs):
+    for epoch_idx in range(num_epochs):
         print('Training')
         train_loss, train_error = run_model(sess, pred_y_var, mean_loss,
                                             x_var,y_var,is_training,
-                                            X_train, y_train, 1, 64, 100, train_step,False)
+                                            X_train, y_train, epoch_idx, 128, 20, train_step,False)
         print('Validation')
         val_loss, val_error = run_model(sess, pred_y_var, mean_loss,
                                         x_var, y_var, is_training, X_val, y_val)
@@ -79,7 +79,7 @@ def main():
 
 def run_model(session, pred_y_var, loss_var,
               x_var,y_var,is_training, Xd, yd,
-              epochs=1, batch_size=64, print_every=100,
+              epoch_idx=0, batch_size=64, print_every=100,
               training=None, plot_losses=False):
     # have tensorflow compute accuracy
     rel_err_var = tf.divide(tf.abs(tf.subtract(y_var, pred_y_var)), y_var)
@@ -98,48 +98,51 @@ def run_model(session, pred_y_var, loss_var,
 
     # counter
     iter_cnt = 0
-    for e in range(epochs):
-        # keep track of losses and accuracy
-        errors = 0
-        losses = []
-        # make sure we iterate over the dataset once
-        for i in range(int(Xd.shape[0] / batch_size)+1):
-            # generate indices for the batch
-            start_idx = (i * batch_size) % Xd.shape[0]
-            idx = train_indices[start_idx:start_idx + batch_size]
 
-            # create a feed dictionary for this batch
-            feed_dict = {x_var: Xd[idx, :],
-                         y_var: yd[idx],
-                         is_training: training_now}
-            # get batch size
-            actual_batch_size = yd[i:i + batch_size].shape[0]
+    # keep track of losses and accuracy
+    errors = 0
+    losses = []
 
-            # have tensorflow compute loss and correct predictions
-            # and (if given) perform a training step
-            loss, rel_err, _ = session.run(variables, feed_dict=feed_dict)
+    # make sure we iterate over the dataset once
+    for i in range(int(Xd.shape[0] / batch_size)+1):
+        # generate indices for the batch
+        start_idx = (i * batch_size) % Xd.shape[0]
+        idx = train_indices[start_idx:start_idx + batch_size]
 
-            # aggregate performance stats
-            losses.append(loss * actual_batch_size)
-            errors += np.sum(rel_err)
+        # create a feed dictionary for this batch
+        feed_dict = {x_var: Xd[idx, :],
+                     y_var: yd[idx],
+                     is_training: training_now}
+        # get batch size
+        actual_batch_size = yd[i:i + batch_size].shape[0]
 
-            # print every now and then
-            if training_now and (iter_cnt % print_every) == 0:
-                print("Iteration {0}: with minibatch training loss = {1:.3g} and relative error of {2:.2g}" \
-                      .format(iter_cnt, loss, np.sum(rel_err) / actual_batch_size))
-            iter_cnt += 1
-        total_error = errors / Xd.shape[0]
-        total_loss = np.sum(losses) / Xd.shape[0]
+        # have tensorflow compute loss and correct predictions
+        # and (if given) perform a training step
+        loss, rel_err, _ = session.run(variables, feed_dict=feed_dict)
 
-        print("Epoch {2}, Overall loss = {0:.3g} and relative error of {1:.3g}" \
-              .format(total_loss, total_error, e + 1))
-        if plot_losses:
-            plt.plot(losses)
-            plt.grid(True)
-            plt.title('Epoch {} Loss'.format(e + 1))
-            plt.xlabel('minibatch number')
-            plt.ylabel('minibatch loss')
-            plt.show()
+        # aggregate performance stats
+        losses.append(loss * actual_batch_size)
+        errors += np.sum(rel_err)
+
+        # print every now and then
+        if training_now and (iter_cnt % print_every) == 0:
+            print("Iteration {0}: with minibatch training loss = {1:.3g} and relative error of {2:.2g}"
+                  .format(iter_cnt, loss, np.sum(rel_err) / actual_batch_size))
+        iter_cnt += 1
+    total_error = errors / Xd.shape[0]
+    total_loss = np.sum(losses) / Xd.shape[0]
+
+    print("Epoch {2}, Overall loss = {0:.3g} and relative error of {1:.3g}"
+          .format(total_loss, total_error, epoch_idx+1 ))
+
+    if plot_losses:
+        plt.plot(losses)
+        plt.grid(True)
+        plt.title('Epoch {} Loss'.format(epoch_idx + 1))
+        plt.xlabel('minibatch number')
+        plt.ylabel('minibatch loss')
+        plt.show()
+
     return total_loss, total_error
 
 
@@ -148,24 +151,38 @@ def cnn_73_model(X, y, is_training):
     conv1 = tf.layers.conv2d(
         inputs=X,
         filters=32,
-        kernel_size=[3, 3],
+        kernel_size=[7, 7],
         padding="same",
         activation=tf.nn.relu)
     bn1 = tf.layers.batch_normalization(inputs=conv1, axis=1)
-    pool1 = tf.layers.max_pooling2d(inputs=bn1, pool_size=[2, 2], strides=2)
+    conv2 = tf.layers.conv2d(
+        inputs=bn1,
+        filters=32,
+        kernel_size=[5, 5],
+        padding="same",
+        activation=tf.nn.relu)
+    bn2 = tf.layers.batch_normalization(inputs=conv2, axis=1)
+    pool1 = tf.layers.max_pooling2d(inputs=bn2, pool_size=[2, 2], strides=2)
 
     # CBP sandwich 2
-    conv2 = tf.layers.conv2d(
+    conv3 = tf.layers.conv2d(
         inputs=pool1,
         filters=64,
         kernel_size=[3, 3],
         padding="same",
         activation=tf.nn.relu)
-    bn2 = tf.layers.batch_normalization(inputs=conv2, axis=1)
-    pool2 = tf.layers.max_pooling2d(inputs=bn2, pool_size=[2, 2], strides=2)
+    bn3 = tf.layers.batch_normalization(inputs=conv3, axis=1)
+    conv4 = tf.layers.conv2d(
+        inputs=bn3,
+        filters=64,
+        kernel_size=[3, 3],
+        padding="same",
+        activation=tf.nn.relu)
+    bn4 = tf.layers.batch_normalization(inputs=conv4, axis=1)
+    pool2 = tf.layers.max_pooling2d(inputs=bn4, pool_size=[2, 2], strides=2)
 
     # Two fully connected nets
-    pool2_flat = tf.reshape(pool2, [-1, 20 * 15 * 64])
+    pool2_flat = tf.reshape(pool2, [-1, 15 * 15 * 64])
     dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
     dropout = tf.layers.dropout(
         inputs=dense, rate=0.4, training=is_training)
