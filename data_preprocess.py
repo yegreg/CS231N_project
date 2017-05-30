@@ -14,10 +14,11 @@ def main():
     image_names = os.listdir(image_folder)
     image_names_format = "%Y%m%d_%H%M%S.jpg"
 
-    number_images = len(image_names)
+    number_images = len(image_names)-1
     output_img_shape = [60, 60, 3]
     all_images = np.ndarray([number_images] + output_img_shape,dtype='uint8')
     pv_outputs = np.zeros(number_images)
+    all_times = np.zeros(number_images).astype(datetime.datetime)
     mono_pv_csv = pd.read_csv("mono_pv_output.csv")
 
     curr_time = time.process_time()
@@ -29,8 +30,8 @@ def main():
         # resizing the image to output_img_shape
         resizing_ratio = output_img_shape[0] / img.shape[0]
         all_images[i] = cv2.resize(img, None, fx=resizing_ratio, fy=resizing_ratio)
-        image_time = datetime.datetime.strptime(image_names[i], image_names_format)
-        pv_outputs[i] = find_pv_output(image_time, mono_pv_csv)
+        all_times[i] = datetime.datetime.strptime(image_names[i], image_names_format)
+        pv_outputs[i] = find_pv_output(all_times[i], mono_pv_csv)
 
         if i%10 ==0:
             print('image processed: ',i, '/',number_images)
@@ -39,8 +40,10 @@ def main():
     print(np.sum(np.isnan(pv_outputs)),' images do not have matching pv output')
     valid_indices = np.logical_not(np.isnan(pv_outputs))
     all_images = all_images[valid_indices, :, :, :]
+    all_times = all_times[valid_indices]
     pv_outputs = pv_outputs[valid_indices]
 
+    np.save('timestamps.npy',all_times)
     np.save('images.npy', all_images)
     np.save('pv_outputs', pv_outputs)
 
